@@ -15,20 +15,32 @@ const User = require('./models/User');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Extensive logging middleware
+// Logging configuration
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+const ENABLE_WEBHOOK_LOGGING = process.env.ENABLE_WEBHOOK_LOGGING === 'true';
+
+// Logging middleware with configurable verbosity
+function logRequest(req, level = 'info') {
+    if (level === LOG_LEVEL || LOG_LEVEL === 'debug') {
+        console.log('---REQUEST RECEIVED---');
+        console.log('Method:', req.method);
+        console.log('Path:', req.path);
+        console.log('Headers:', JSON.stringify(req.headers, null, 2));
+        console.log('Body:', JSON.stringify(req.body, null, 2));
+    }
+}
+
+// Middleware
 app.use((req, res, next) => {
-    console.log('---REQUEST RECEIVED---');
-    console.log('Method:', req.method);
-    console.log('Path:', req.path);
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('Body:', JSON.stringify(req.body, null, 2));
+    logRequest(req);
     next();
 });
 
-// Middleware
 app.use(express.json());
 app.use(cors({
-    origin: '*',
+    origin: process.env.NODE_ENV === 'production' 
+        ? process.env.MINI_APP_URL 
+        : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -48,17 +60,24 @@ const APP_URL = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}` 
     : process.env.MINI_APP_URL || 'http://localhost:3000';
 
-console.log('ENVIRONMENT DETAILS:');
-console.log('process.env.VERCEL_URL:', process.env.VERCEL_URL);
-console.log('process.env.MINI_APP_URL:', process.env.MINI_APP_URL);
-console.log('RESOLVED APP_URL:', APP_URL);
+console.log('ENVIRONMENT CONFIGURATION:');
+console.log('Node Environment:', process.env.NODE_ENV);
+console.log('Log Level:', LOG_LEVEL);
+console.log('Webhook Logging:', ENABLE_WEBHOOK_LOGGING);
+console.log('Vercel URL:', process.env.VERCEL_URL);
+console.log('Mini App URL:', process.env.MINI_APP_URL);
+console.log('Resolved App URL:', APP_URL);
 
 // Webhook diagnostics function
 async function diagnoseWebhook() {
     try {
-        const response = await axios.get(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/getWebhookInfo`);
-        console.log('Telegram Webhook Diagnostics:');
-        console.log('Webhook Info:', JSON.stringify(response.data, null, 2));
+        const response = await axios.get(`${process.env.TELEGRAM_API_BASE_URL}${process.env.BOT_TOKEN}/getWebhookInfo`);
+        
+        if (ENABLE_WEBHOOK_LOGGING) {
+            console.log('Telegram Webhook Diagnostics:');
+            console.log('Webhook Info:', JSON.stringify(response.data, null, 2));
+        }
+        
         return response.data;
     } catch (error) {
         console.error('Failed to retrieve webhook info:', error);
@@ -76,7 +95,7 @@ try {
     });
 
     // Webhook URL validation and logging
-    const webhookUrl = `${APP_URL.replace(/\/+$/, '')}/webhook/${process.env.BOT_TOKEN}`;
+    const webhookUrl = `${APP_URL.replace(/\/+$/, '')}${process.env.WEBHOOK_PATH}`;
     console.log('Attempting to set webhook URL:', webhookUrl);
 
     bot.setWebHook(webhookUrl, {
@@ -89,7 +108,7 @@ try {
         // Perform additional diagnostics
         const webhookInfo = await diagnoseWebhook();
         
-        if (webhookInfo) {
+        if (webhookInfo && ENABLE_WEBHOOK_LOGGING) {
             console.log('Webhook Diagnostics:');
             console.log('URL:', webhookInfo.result.url);
             console.log('Pending Update Count:', webhookInfo.result.pending_update_count);
@@ -117,8 +136,10 @@ try {
 }
 
 // Webhook route with comprehensive error handling
-app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
-    console.log('Webhook received:', JSON.stringify(req.body, null, 2));
+app.post(process.env.WEBHOOK_PATH, (req, res) => {
+    if (ENABLE_WEBHOOK_LOGGING) {
+        console.log('Webhook received:', JSON.stringify(req.body, null, 2));
+    }
     
     try {
         if (bot && req.body) {
@@ -339,10 +360,19 @@ app.get('/health', async (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         environment: {
+            NODE_ENV: process.env.NODE_ENV,
             VERCEL_URL: process.env.VERCEL_URL,
             MINI_APP_URL: process.env.MINI_APP_URL,
             RESOLVED_APP_URL: APP_URL,
-            WEBHOOK_URL: `${APP_URL}/webhook/${process.env.BOT_TOKEN}`
+            WEBHOOK_URL: `${APP_URL}${process.env.WEBHOOK_PATH}`
+        },
+        gameConfig: {
+            maxBullsPerUser: process.env.MAX_BULLS_PER_USER,
+            trainingCooldown: process.env.TRAINING_COOLDOWN_MINUTES
+        },
+        featureFlags: {
+            betaFeatures: process.env.ENABLE_BETA_FEATURES === 'true',
+            performanceTracking: process.env.ENABLE_PERFORMANCE_TRACKING === 'true'
         },
         webhookDiagnostics: webhookInfo
     });
