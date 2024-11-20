@@ -61,22 +61,50 @@ try {
         }
     });
 
-    console.log('Webhook URL:', `${APP_URL}/webhook/${process.env.BOT_TOKEN}`);
+    // Webhook URL validation and logging
+    const webhookUrl = `${APP_URL.replace(/\/+$/, '')}/webhook/${process.env.BOT_TOKEN}`;
+    console.log('Attempting to set webhook URL:', webhookUrl);
 
-    bot.setWebHook(`${APP_URL}/webhook/${process.env.BOT_TOKEN}`)
-        .then(() => {
-            console.log('Webhook set successfully');
-            return bot.getWebHookInfo();
-        })
-        .then((info) => {
-            console.log('Webhook info:', JSON.stringify(info, null, 2));
-        })
-        .catch(error => {
-            console.error('Failed to set webhook:', error);
-        });
+    bot.setWebHook(webhookUrl, {
+        // Optional certificate for secure webhook
+        // certificate: fs.readFileSync('/path/to/cert.pem')
+    })
+    .then(() => {
+        console.log('Webhook set successfully');
+        return bot.getWebHookInfo();
+    })
+    .then((info) => {
+        console.log('Webhook info:', JSON.stringify(info, null, 2));
+        
+        // Additional validation
+        if (!info.url) {
+            console.error('Webhook URL not set correctly');
+        }
+    })
+    .catch(error => {
+        console.error('Failed to set webhook:', error);
+        console.error('Detailed error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    });
 } catch (error) {
     console.error('Error initializing Telegram Bot:', error);
 }
+
+// Webhook route with comprehensive error handling
+app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
+    console.log('Webhook received:', JSON.stringify(req.body, null, 2));
+    
+    try {
+        if (bot && req.body) {
+            bot.processUpdate(req.body);
+        } else {
+            console.error('Bot not initialized or no body received');
+        }
+        res.sendStatus(200);
+    } catch (error) {
+        console.error('Webhook processing error:', error);
+        res.status(500).json({ error: 'Webhook processing failed' });
+    }
+});
 
 // Bot command handlers with extensive logging
 bot?.onText(/\/start/, (msg) => {
@@ -276,14 +304,7 @@ app.post('/api/bulls/:id/train', authenticateToken, async (req, res) => {
     }
 });
 
-// Webhook handler
-app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
-    console.log('Webhook request received:', req.body);
-    bot.handleUpdate(req.body);
-    res.sendStatus(200);
-});
-
-// Health check endpoint
+// Health check endpoint with webhook validation
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
@@ -291,7 +312,8 @@ app.get('/health', (req, res) => {
         environment: {
             VERCEL_URL: process.env.VERCEL_URL,
             MINI_APP_URL: process.env.MINI_APP_URL,
-            RESOLVED_APP_URL: APP_URL
+            RESOLVED_APP_URL: APP_URL,
+            WEBHOOK_URL: `${APP_URL}/webhook/${process.env.BOT_TOKEN}`
         }
     });
 });
