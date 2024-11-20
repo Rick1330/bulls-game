@@ -16,8 +16,14 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public'));
-app.use(cors());
+app.use(cors({
+    origin: '*', // Allow all origins in development
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Initialize Telegram Bot
 const bot = new TelegramBot(process.env.BOT_TOKEN, {
@@ -57,28 +63,41 @@ bot.onText(/\/start/, (msg) => {
 
 // Verify Telegram WebApp data
 function verifyTelegramWebAppData(initData) {
-    const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    params.delete('hash');
+    try {
+        const params = new URLSearchParams(initData);
+        const hash = params.get('hash');
+        
+        if (!hash) {
+            console.log('No hash found in initData');
+            return false;
+        }
 
-    // Sort parameters alphabetically
-    const paramsList = Array.from(params.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, value]) => `${key}=${value}`)
-        .join('\n');
+        params.delete('hash');
 
-    // Calculate data-check-string
-    const secretKey = crypto
-        .createHmac('sha256', 'WebAppData')
-        .update(process.env.BOT_TOKEN)
-        .digest();
+        // Sort parameters alphabetically
+        const paramsList = Array.from(params.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}=${value}`)
+            .join('\n');
 
-    const generatedHash = crypto
-        .createHmac('sha256', secretKey)
-        .update(paramsList)
-        .digest('hex');
+        // Calculate data-check-string
+        const secretKey = crypto
+            .createHmac('sha256', 'WebAppData')
+            .update(process.env.BOT_TOKEN)
+            .digest();
 
-    return hash === generatedHash;
+        const generatedHash = crypto
+            .createHmac('sha256', secretKey)
+            .update(paramsList)
+            .digest('hex');
+
+        const isValid = hash === generatedHash;
+        console.log('Telegram data verification:', { isValid, hash, generatedHash });
+        return isValid;
+    } catch (error) {
+        console.error('Error verifying Telegram data:', error);
+        return false;
+    }
 }
 
 // Authentication middleware
@@ -92,6 +111,7 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
+            console.error('Token verification error:', err);
             return res.status(403).json({ error: 'Invalid or expired token' });
         }
 
@@ -113,8 +133,8 @@ function authenticateToken(req, res, next) {
 // API Routes
 app.post('/api/auth', async (req, res) => {
     try {
+        console.log('Auth request received:', req.body);
         const { initData } = req.body;
-        console.log('Auth request:', { initData });
 
         if (!initData) {
             throw new Error('No initialization data provided');
@@ -122,6 +142,7 @@ app.post('/api/auth', async (req, res) => {
 
         // Verify the data
         if (!verifyTelegramWebAppData(initData)) {
+            console.error('Invalid initialization data');
             throw new Error('Invalid initialization data');
         }
 
@@ -217,6 +238,23 @@ app.post('/api/bulls/:id/train', authenticateToken, async (req, res) => {
         console.error('Error training bull:', error);
         res.status(500).json({ error: 'Failed to train bull' });
     }
+});
+
+// Webhook handler
+app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
+    console.log('Webhook request received:', req.body);
+    bot.handleUpdate(req.body);
+    res.sendStatus(200);
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Handle all other routes - serve index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Connect to MongoDB
