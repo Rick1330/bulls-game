@@ -23,11 +23,5 @@
       "src": "/(.*)",
       "dest": "public/$1"
     }
-  ],
-  "env": {
-    "MINI_APP_URL": "@mini_app_url",
-    "BOT_TOKEN": "@bot_token",
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret"
-  }
+  ]
 }
