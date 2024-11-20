@@ -6,6 +6,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const axios = require('axios');
 
 // Import models
 const Bull = require('./models/Bull');
@@ -52,6 +53,19 @@ console.log('process.env.VERCEL_URL:', process.env.VERCEL_URL);
 console.log('process.env.MINI_APP_URL:', process.env.MINI_APP_URL);
 console.log('RESOLVED APP_URL:', APP_URL);
 
+// Webhook diagnostics function
+async function diagnoseWebhook() {
+    try {
+        const response = await axios.get(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/getWebhookInfo`);
+        console.log('Telegram Webhook Diagnostics:');
+        console.log('Webhook Info:', JSON.stringify(response.data, null, 2));
+        return response.data;
+    } catch (error) {
+        console.error('Failed to retrieve webhook info:', error);
+        return null;
+    }
+}
+
 // Initialize Telegram Bot with error handling
 let bot;
 try {
@@ -69,8 +83,21 @@ try {
         // Optional certificate for secure webhook
         // certificate: fs.readFileSync('/path/to/cert.pem')
     })
-    .then(() => {
+    .then(async () => {
         console.log('Webhook set successfully');
+        
+        // Perform additional diagnostics
+        const webhookInfo = await diagnoseWebhook();
+        
+        if (webhookInfo) {
+            console.log('Webhook Diagnostics:');
+            console.log('URL:', webhookInfo.result.url);
+            console.log('Pending Update Count:', webhookInfo.result.pending_update_count);
+            console.log('Last Error Date:', webhookInfo.result.last_error_date ? 
+                new Date(webhookInfo.result.last_error_date * 1000).toISOString() : 'No recent errors');
+            console.log('Last Error Message:', webhookInfo.result.last_error_message || 'N/A');
+        }
+        
         return bot.getWebHookInfo();
     })
     .then((info) => {
@@ -305,7 +332,9 @@ app.post('/api/bulls/:id/train', authenticateToken, async (req, res) => {
 });
 
 // Health check endpoint with webhook validation
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+    const webhookInfo = await diagnoseWebhook();
+    
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -314,7 +343,8 @@ app.get('/health', (req, res) => {
             MINI_APP_URL: process.env.MINI_APP_URL,
             RESOLVED_APP_URL: APP_URL,
             WEBHOOK_URL: `${APP_URL}/webhook/${process.env.BOT_TOKEN}`
-        }
+        },
+        webhookDiagnostics: webhookInfo
     });
 });
 
