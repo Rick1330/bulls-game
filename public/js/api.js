@@ -22,18 +22,23 @@ class API {
     }
 
     async handleResponse(response) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || 'API request failed');
+        try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || data.message || 'API request failed');
+                }
+                return data;
             }
-            return data;
+            if (!response.ok) {
+                throw new Error('API request failed');
+            }
+            return await response.text();
+        } catch (error) {
+            console.error('API Response Error:', error);
+            throw error;
         }
-        if (!response.ok) {
-            throw new Error('API request failed');
-        }
-        return response.text();
     }
 
     async post(endpoint, data) {
@@ -42,11 +47,10 @@ class API {
             const response = await fetch(this.baseUrl + endpoint, {
                 method: 'POST',
                 headers: this.getHeaders(),
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                credentials: 'include'
             });
-            const result = await this.handleResponse(response);
-            console.log(`POST ${endpoint} response:`, result);
-            return result;
+            return await this.handleResponse(response);
         } catch (error) {
             console.error(`POST ${endpoint} error:`, error);
             throw error;
@@ -58,11 +62,10 @@ class API {
         try {
             const response = await fetch(this.baseUrl + endpoint, {
                 method: 'GET',
-                headers: this.getHeaders()
+                headers: this.getHeaders(),
+                credentials: 'include'
             });
-            const result = await this.handleResponse(response);
-            console.log(`GET ${endpoint} response:`, result);
-            return result;
+            return await this.handleResponse(response);
         } catch (error) {
             console.error(`GET ${endpoint} error:`, error);
             throw error;
@@ -79,8 +82,8 @@ class API {
         return this.get('/bulls');
     }
 
-    async createBull(name) {
-        return this.post('/bulls', { name });
+    async createBull(name, type) {
+        return this.post('/bulls', { name, type });
     }
 
     async trainBull(bullId, attribute) {
