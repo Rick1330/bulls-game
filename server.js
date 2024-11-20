@@ -14,57 +14,87 @@ const User = require('./models/User');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Extensive logging middleware
+app.use((req, res, next) => {
+    console.log('---REQUEST RECEIVED---');
+    console.log('Method:', req.method);
+    console.log('Path:', req.path);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    next();
+});
+
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: '*', // Allow all origins in development
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Initialize Telegram Bot
-const bot = new TelegramBot(process.env.BOT_TOKEN, {
-    webHook: {
-        port: process.env.PORT || 3000
+// Serve static files with detailed logging
+app.use((req, res, next) => {
+    console.log('Static file request:', req.url);
+    next();
+}, express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filePath) => {
+        console.log('Serving static file:', filePath);
     }
-});
+}));
 
-// Dynamically determine the app URL
-const APP_URL = process.env.MINI_APP_URL || 
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+// Dynamically determine the app URL with extensive logging
+const APP_URL = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}` 
+    : process.env.MINI_APP_URL || 'http://localhost:3000';
 
-console.log('Application URL:', APP_URL);
+console.log('ENVIRONMENT DETAILS:');
+console.log('process.env.VERCEL_URL:', process.env.VERCEL_URL);
+console.log('process.env.MINI_APP_URL:', process.env.MINI_APP_URL);
+console.log('RESOLVED APP_URL:', APP_URL);
 
-// Set webhook
-const url = APP_URL;
-console.log('Setting webhook URL:', `${url}/webhook/${process.env.BOT_TOKEN}`);
-
-bot.setWebHook(`${url}/webhook/${process.env.BOT_TOKEN}`)
-    .then(() => {
-        console.log('Webhook set successfully');
-        return bot.getWebHookInfo();
-    })
-    .then((info) => {
-        console.log('Webhook info:', info);
-    })
-    .catch(error => {
-        console.error('Failed to set webhook:', error);
+// Initialize Telegram Bot with error handling
+let bot;
+try {
+    bot = new TelegramBot(process.env.BOT_TOKEN, {
+        webHook: {
+            port: process.env.PORT || 3000
+        }
     });
 
-// Bot command handlers
-bot.onText(/\/start/, (msg) => {
+    console.log('Webhook URL:', `${APP_URL}/webhook/${process.env.BOT_TOKEN}`);
+
+    bot.setWebHook(`${APP_URL}/webhook/${process.env.BOT_TOKEN}`)
+        .then(() => {
+            console.log('Webhook set successfully');
+            return bot.getWebHookInfo();
+        })
+        .then((info) => {
+            console.log('Webhook info:', JSON.stringify(info, null, 2));
+        })
+        .catch(error => {
+            console.error('Failed to set webhook:', error);
+        });
+} catch (error) {
+    console.error('Error initializing Telegram Bot:', error);
+}
+
+// Bot command handlers with extensive logging
+bot?.onText(/\/start/, (msg) => {
+    console.log('Start command received:', JSON.stringify(msg, null, 2));
     const chatId = msg.chat.id;
     const keyboard = {
         inline_keyboard: [
             [{ text: '🎮 Play Bulls Game', web_app: { url: APP_URL } }]
         ]
     };
-    bot.sendMessage(chatId, 'Welcome to Bulls Game! Click the button below to start playing:', {
-        reply_markup: keyboard
-    });
+    
+    try {
+        bot.sendMessage(chatId, 'Welcome to Bulls Game! Click the button below to start playing:', {
+            reply_markup: keyboard
+        });
+    } catch (error) {
+        console.error('Error sending start message:', error);
+    }
 });
 
 // Verify Telegram WebApp data
@@ -255,7 +285,15 @@ app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: {
+            VERCEL_URL: process.env.VERCEL_URL,
+            MINI_APP_URL: process.env.MINI_APP_URL,
+            RESOLVED_APP_URL: APP_URL
+        }
+    });
 });
 
 // Handle all other routes - serve index.html
@@ -263,7 +301,22 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Connect to MongoDB
+// Catch-all route with logging
+app.use((req, res, next) => {
+    console.log('Unhandled route:', req.method, req.path);
+    next();
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message
+    });
+});
+
+// Connect to MongoDB with extensive logging
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
         console.log('Connected to MongoDB');
@@ -271,6 +324,12 @@ mongoose.connect(process.env.MONGODB_URI)
         // Start the server
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
+            console.log('Full server configuration:', {
+                PORT,
+                MONGODB_URI: process.env.MONGODB_URI ? 'CONFIGURED' : 'NOT SET',
+                BOT_TOKEN: process.env.BOT_TOKEN ? 'CONFIGURED' : 'NOT SET',
+                APP_URL
+            });
         });
     })
     .catch(error => {
