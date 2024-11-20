@@ -32,8 +32,14 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, {
     }
 });
 
+// Dynamically determine the app URL
+const APP_URL = process.env.MINI_APP_URL || 
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
+console.log('Application URL:', APP_URL);
+
 // Set webhook
-const url = process.env.MINI_APP_URL;
+const url = APP_URL;
 console.log('Setting webhook URL:', `${url}/webhook/${process.env.BOT_TOKEN}`);
 
 bot.setWebHook(`${url}/webhook/${process.env.BOT_TOKEN}`)
@@ -53,7 +59,7 @@ bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🎮 Play Bulls Game', web_app: { url: process.env.MINI_APP_URL } }]
+            [{ text: '🎮 Play Bulls Game', web_app: { url: APP_URL } }]
         ]
     };
     bot.sendMessage(chatId, 'Welcome to Bulls Game! Click the button below to start playing:', {
