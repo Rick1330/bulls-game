@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Bulls Game</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/api.js" defer></script>
+    <script src="/js/game.js" defer></script>
+    <style>
+        .error-message {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 80%;
+        }
+        .error-message h2 {
+            color: #ff4444;
+            margin-bottom: 10px;
+        }
+        .error-message p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .error-message a {
+            color: #0088cc;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="error-message" class="error-message">
+        <h2>Direct Access Not Allowed</h2>
+        <p>This game can only be accessed through Telegram.</p>
+        <p>Please visit: <a href="https://t.me/bullsbite_bot/bullsgame">Bulls Game on Telegram</a></p>
+    </div>
+
+    <div id="loading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Loading game...</p>
+    </div>
+
+    <!-- User Stats Section -->
+    <header class="user-stats" id="user-stats">
+        <!-- Stats will be dynamically populated -->
+    </header>
+
+    <!-- Main Game Sections -->
+    <main class="game-container">
+        <!-- Bulls Section -->
+        <section id="bulls" class="section active">
+            <h2>My Bulls</h2>
+            <div id="bulls-container" class="bulls-grid">
+                <!-- Bull cards will be dynamically populated -->
+            </div>
+        </section>
+
+        <!-- Training Section -->
+        <section id="training" class="section">
+            <h2>Training Arena</h2>
+            <div class="training-controls">
+                <button id="train-strength" class="btn" data-original-text="Train Strength">
+                    <i class="fas fa-dumbbell"></i> Train Strength
+                </button>
+                <button id="train-speed" class="btn" data-original-text="Train Speed">
+                    <i class="fas fa-bolt"></i> Train Speed
+                </button>
+                <button id="train-stamina" class="btn" data-original-text="Train Stamina">
+                    <i class="fas fa-heart"></i> Train Stamina
+                </button>
+                <button id="feed-bull" class="btn">
+                    <i class="fas fa-drumstick-bite"></i> Feed Bull
+                </button>
+            </div>
+        </section>
+
+        <!-- Create Bull Section -->
+        <section id="create" class="section">
+            <h2>Create New Bull</h2>
+            <form id="create-bull-form" class="create-form">
+                <div class="form-group">
+                    <label for="name">Bull Name:</label>
+                    <input type="text" id="name" name="name" required minlength="3" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="type">Bull Type:</label>
+                    <select id="type" name="type" required>
+                        <option value="standard">Standard Bull</option>
+                        <option value="speed">Speed Bull</option>
+                        <option value="power">Power Bull</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn primary">Create Bull</button>
+            </form>
+        </section>
+
+        <!-- Shop Section -->
+        <section id="shop" class="section">
+            <h2>Bull Shop</h2>
+            <div id="shop-items" class="shop-grid">
+                <!-- Shop items will be dynamically populated -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-btn active" data-section="bulls">
+            <i class="fas fa-bull"></i>
+            <span>Bulls</span>
+        </button>
+        <button class="nav-btn" data-section="training">
+            <i class="fas fa-dumbbell"></i>
+            <span>Train</span>
+        </button>
+        <button class="nav-btn" data-section="create">
+            <i class="fas fa-plus"></i>
+            <span>Create</span>
+        </button>
+        <button class="nav-btn" data-section="shop">
+            <i class="fas fa-store"></i>
+            <span>Shop</span>
+        </button>
+    </nav>
+</body>
+</html>
